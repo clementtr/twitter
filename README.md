@@ -1,7 +1,7 @@
 <h2><u> Text Mining & Sentiment Analysis <u></h2>
 
 <h3> Context </h3>
-<p> Build a typology of words found on twitter from its tone and emotional connotation </p>
+<p> Build a typology of words found on <b>twitter</b> from its tone and emotional connotation </p>
 
 <h3> Tasks and Goals </h3>
 <ol>
