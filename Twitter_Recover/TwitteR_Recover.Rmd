@@ -11,7 +11,7 @@ output:
 
 ```{R}
 #install.packages("twitteR")
-library(twitteR)
+#library(twitteR)
 
 setwd("/Users/clementtailleur/R/ESME/TwitteR")
 
