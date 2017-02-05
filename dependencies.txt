@@ -1,0 +1,8 @@
+install.packages(« twitteR »)
+install.packages(« tm »)
+install.packages(« wordcloud »)
+install.packages(« SnowballC »)
+install.packages("plyr")
+
+require(devtools)
+install_github("lchiffon/wordcloud2")
