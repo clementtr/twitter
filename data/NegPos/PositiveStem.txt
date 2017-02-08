@@ -186,7 +186,6 @@ cohérent
 cohes
 vertébral
 color
-comm
 commod
 compact
 compatibl
