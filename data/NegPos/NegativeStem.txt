@@ -886,8 +886,6 @@ fatiqu
 fatuit
 fauss
 fausset
-faut
-fauteur
 troubl
 faux
 feindr
@@ -2189,7 +2187,6 @@ totalitair
 toupet
 tour
 ralent
-tout
 toxicoman
 toxiqu
 trac
