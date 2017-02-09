@@ -243,6 +243,8 @@ dank
 danken
 félicit
 fêt
+fort
+uni
 premi plan
 préférent
 tout cœur
@@ -749,6 +751,7 @@ protect
 proteg
 prouess
 prouv
+progres
 provident
 prudent
 prudenc
