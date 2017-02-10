@@ -106,7 +106,6 @@ $(document).ready(function () {
 
 <!-- code folding -->
 
-
 <style>
 ul {
     list-style-type: none;
@@ -141,6 +140,7 @@ li a {
 
 
 
+
 <div class="fluid-row" id="header">
 
 
@@ -160,7 +160,8 @@ Data recover on Twitter
 <pre class="r"><code>#install.packages(&quot;twitteR&quot;)
 library(twitteR)
 
-setwd(&quot;/Users/clementtailleur/R/ESME/TwitteR&quot;)
+#Enter your own way to go to TwitteR repository: mine is &quot;/Users/clementtailleur/TwitteR&quot; for example
+setwd(&quot;/Users/clementtailleur/TwitteR&quot;)
 
 # Create application on dev.twitter.com called 'TwitteR ESME'
 api_key &lt;- &quot;QWvyjcma0R6JC2tsdcfrFOzxM&quot;
@@ -177,71 +178,75 @@ cat(&quot;Full size:&quot;, length(Winamax_tweets))</code></pre>
 <pre><code>## Full size: 20</code></pre>
 <pre class="r"><code>head(Winamax_tweets, 10)</code></pre>
 <pre><code>## [[1]]
-## [1] &quot;WinamaxSport: @ClementDivel Bien tenté ;)&quot;
+## [1] &quot;WinamaxSport: @lorisottoo Si bien sûr tu es éligible, je te laisse lire &amp;gt; https://t.co/bXy3KjO5rk&quot;
 ## 
 ## [[2]]
-## [1] &quot;WinamaxSport: @WinamaxSport Le règlement #FreeBet à lire &amp;gt; https://t.co/ERHXrNoESz Tirage au sort du gagnant à 14h15.&quot;
+## [1] &quot;WinamaxSport: @lorisottoo Tu peux continuer à parier et tu seras remboursé de ton premier pari perdant après avoir renseigné le code.&quot;
 ## 
 ## [[3]]
-## [1] &quot;WinamaxSport: Combien de titres internationaux Daniel Narcisse a-t-il remporté ? #Freebet https://t.co/e7lFtBGfCk&quot;
+## [1] &quot;WinamaxSport: @lorisottoo Tu vas recevoir un courrier avec le code d'activation. Tu seras remboursé après avoir rentré ce code.&quot;
 ## 
 ## [[4]]
-## [1] &quot;WinamaxSport: @NoellaNeffati Après cette vanne, nous avons décidé de libérer un poste de CM. Bienvenue. @courbolinho&quot;
+## [1] &quot;WinamaxSport: @lorisottoo Si tu parles du premier pari remboursé, il faut valider ton compte en envoyant RIB et pièce d'identité.&quot;
 ## 
 ## [[5]]
-## [1] &quot;WinamaxSport: - 83 kilos... Mets l'autre pied maintenant Dimitri.\n- Comment ça ?\n- Dimitri stp. Mets l'autre pied... Merci. https://t.co/pCvuJPmnmh&quot;
+## [1] &quot;WinamaxSport: @lorisottoo Salut, dans quel cadre as-tu obtenu ce pari gratuit ?&quot;
 ## 
 ## [[6]]
-## [1] &quot;WinamaxSport: \&quot;Raiseonce16\&quot; avait vu plus de 2,5 buts lors du match Angers - Metz. L'inconscience paye avec 2 507,37 € de gains.… https://t.co/G8aZc8dzV9&quot;
+## [1] &quot;WinamaxSport: On débute ce week-end avec la grille 7 du soir. Plus de 10 000 € ont déjà été collectés. #MaGrille https://t.co/9EsZd1L1vV&quot;
 ## 
 ## [[7]]
-## [1] &quot;WinamaxSport: @BopeGfx Salut, merci de prendre contact avec le support à ce mail : support@winamax.fr. Il va t'expliquer comment retirer :)&quot;
+## [1] &quot;WinamaxSport: @Jeremy8200 @mehdi________ C'est en cours.&quot;
 ## 
 ## [[8]]
-## [1] &quot;WinamaxSport: @BopeGfx Le courrier a été envoyé le 27, il ne devrait pas tarder à arriver.&quot;
+## [1] &quot;WinamaxSport: @NicolasBelliard Salut, oui.&quot;
 ## 
 ## [[9]]
-## [1] &quot;WinamaxSport: @BopeGfx Peux-tu me préciser ton pseudo Winamax stp ?&quot;
+## [1] &quot;WinamaxSport: @mehdi________ Oui.&quot;
 ## 
 ## [[10]]
-## [1] &quot;WinamaxSport: @ClementDivel On a eu un petit bug mais cela a été réglé. Merci pour ton message.&quot;</code></pre>
+## [1] &quot;WinamaxSport: Lassana Diarra accepte d'aller à Nantes si on lui assure une place de titulaire et si on lui paye le déplacement en jet privé. #FCNOM&quot;</code></pre>
 <p><font face="Gill Sans" color="#261D7A" size="3.2">Now we can get a number n tweets containing the value of string placed in first argument. Note that the Twitter search API only goes back 1500 tweets <br> Let’s recover 10.000 and 20.000 tweets with the ‘#PrimaireLeDébat’ word and create a dataframe based around results. </font></p>
 <pre class="r"><code>require(twitteR)
 #primaireTweets &lt;- searchTwitter(&quot;#PrimaireLeDébat&quot;, n=10000)
-primaireTweets &lt;- searchTwitter(&quot;#PrimaireLeDébat&quot;, n=10) # Display that for html but run line above for project
- 
-primaire_df &lt;- do.call(&quot;rbind&quot;, lapply(primaireTweets, as.data.frame))
-cat(&quot;Columns names:\n&quot;, names(primaire_df))</code></pre>
+#lalalandTweets &lt;- searchTwitter(&quot;#Lalaland&quot;, n=1000, lang=&quot;en&quot;)
+primaireTweets &lt;- searchTwitter(&quot;#PrimaireLeDébat&quot;, n=10) # Display that for html but run lines above for project
+
+yourTweets = primaireTweets #lalalandTweets
+your_df &lt;- do.call(&quot;rbind&quot;, lapply(yourTweets, as.data.frame))
+cat(&quot;Columns names:\n&quot;, names(your_df))</code></pre>
 <pre><code>## Columns names:
 ##  text favorited favoriteCount replyToSN created truncated replyToSID id replyToUID statusSource screenName retweetCount isRetweet retweeted longitude latitude</code></pre>
-<pre class="r"><code>cat(&quot;Part of your dataframe:&quot;)</code></pre>
-<pre><code>## Part of your dataframe:</code></pre>
-<pre class="r"><code>head(primaire_df,3)</code></pre>
-<pre><code>##                                                                                                                                                                                          text
-## 1                                                            RT @Mayou_30: La femme de @benoithamon est cadre chez LVMH. C'est quand même bien utile le capitalisme parfois. #PrimaireLeDébat
-## 2 RT @David_Epinal: Humour du soir, Bonsoir \xed\xa0\xbe\xed\xb4\xa3\xed\xa0\xbd\xed\xb8\x82\n#Hamon #loitravail #PrimairesCitoyennes #PrimaireGauche #PrimaireLeDebat #jadot #partisocialis…
-## 3                                                      RT @ldeboissieu: Valls est social-libéral (comme Macron), Hamon est social-démocrate (verdi). #PrimaireLeDébat https://t.co/bj5acgD3xt
+<pre class="r"><code>cat(&quot;\n\n\nPart of your dataframe:&quot;)</code></pre>
+<pre><code>## 
+## 
+## 
+## Part of your dataframe:</code></pre>
+<pre class="r"><code>head(your_df,3)</code></pre>
+<pre><code>##                                                                                                                                          text
+## 1 RT @NRondepierre: Quand tu entends #Valls défendre la défiscalisation des heures supplémentaires que la gauche a supprimé #PrimaireLeDébat…
+## 2          RT @MGuillaume22: Et si on essayait un Président honnête ? @FrancoisFillon #PrimaireLeDébat #FillonGagnant https://t.co/5AuF54c4Or
+## 3                                                               RT @_StudioDanielle: Elle a tout dit #PrimaireLeDébat https://t.co/rDZ1MLoXA1
 ##   favorited favoriteCount replyToSN             created truncated
-## 1     FALSE             0        NA 2017-01-30 12:47:03     FALSE
-## 2     FALSE             0        NA 2017-01-30 12:44:40     FALSE
-## 3     FALSE             0        NA 2017-01-30 12:44:33     FALSE
+## 1     FALSE             0        NA 2017-02-10 16:45:24     FALSE
+## 2     FALSE             0        NA 2017-02-10 16:21:24     FALSE
+## 3     FALSE             0        NA 2017-02-10 15:52:26     FALSE
 ##   replyToSID                 id replyToUID
-## 1         NA 826049085824180224         NA
-## 2         NA 826048483358552064         NA
-## 3         NA 826048456762462208         NA
-##                                                                           statusSource
-## 1                   &lt;a href=&quot;http://twitter.com&quot; rel=&quot;nofollow&quot;&gt;Twitter Web Client&lt;/a&gt;
-## 2 &lt;a href=&quot;http://twitter.com/download/android&quot; rel=&quot;nofollow&quot;&gt;Twitter for Android&lt;/a&gt;
-## 3 &lt;a href=&quot;http://twitter.com/download/android&quot; rel=&quot;nofollow&quot;&gt;Twitter for Android&lt;/a&gt;
-##      screenName retweetCount isRetweet retweeted longitude latitude
-## 1 Alexandre1305          140      TRUE     FALSE        NA       NA
-## 2     abou93350          122      TRUE     FALSE        NA       NA
-## 3    FalcozVign            7      TRUE     FALSE        NA       NA</code></pre>
+## 1         NA 830095331392118784         NA
+## 2         NA 830089294740078592         NA
+## 3         NA 830082005660491777         NA
+##                                                                         statusSource
+## 1                 &lt;a href=&quot;http://twitter.com&quot; rel=&quot;nofollow&quot;&gt;Twitter Web Client&lt;/a&gt;
+## 2                 &lt;a href=&quot;http://twitter.com&quot; rel=&quot;nofollow&quot;&gt;Twitter Web Client&lt;/a&gt;
+## 3 &lt;a href=&quot;http://twitter.com/download/iphone&quot; rel=&quot;nofollow&quot;&gt;Twitter for iPhone&lt;/a&gt;
+##        screenName retweetCount isRetweet retweeted longitude latitude
+## 1 P1DWJ20ZZJU5pB2          571      TRUE     FALSE        NA       NA
+## 2      JefMonnier            2      TRUE     FALSE        NA       NA
+## 3       e_marquay          662      TRUE     FALSE        NA       NA</code></pre>
 <p><font face="Gill Sans" color="#261D7A" size="3.2">We create a csv file from our database. </font></p>
-<pre class="r"><code>#write.csv(primaire_df, file = &quot;debat_primaire_10000.csv&quot;, append=TRUE) #append=TRUE to overwrite
-#write.csv(primaire_df, file = &quot;debat_primaire_10000.csv&quot;) 
-#write.csv(primaire_df, file = &quot;debat_primaire_20000.csv&quot;) Let lines in commentary to avoid the changement of our database 
-nrow(primaire_df)</code></pre>
+<pre class="r"><code>#write.csv(your_df, file = &quot;debat_primaire_20000.csv&quot;) Let lines in commentary to avoid the changement of our database 
+#write.csv(your_df, file = &quot;data/Lalaland.csv&quot;)
+nrow(your_df)</code></pre>
 <pre><code>## [1] 10</code></pre>
 
 
