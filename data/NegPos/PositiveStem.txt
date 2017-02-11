@@ -247,7 +247,6 @@ fort
 uni
 premi plan
 préférent
-tout cœur
 valeur
 économ
 dessus
@@ -313,7 +312,6 @@ empaign
 empath
 extas
 essor
-tout sécur
 enchant
 enchanteur
 encourag
@@ -946,8 +944,6 @@ tent
 terribl
 titill
 toler
-tout autour
-tout neuf
 traction
 tranch
 transparent
