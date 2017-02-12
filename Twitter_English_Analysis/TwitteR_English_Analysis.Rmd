@@ -1,0 +1,390 @@
+---
+output: html_document
+---
+
+<p><font size=7 color="#2E1698"><u><center>Twitter English Analysis</center></u></font></p>
+<p><font size=4.5 color="#2E1698"><i><center>Bonus: fast Analysis for introduce English known packages</center></i></font></p><br>
+<p><font size=3.2 color="#2E1698"><i><u>Introduction:</u></i>We are here aiming to manipulate the data that we generated before in the recover notebook. Our data was provided by the Twitter API and was filtring with the '#Lalaland' hashtag. We recovered our data Thursday 4th February 2017 on week after it theatrical release.</font><p>
+<br>
+<font color="#206B50" size = 4.5><center>**SUMMARY**</center></font>
+<font size=3.2 color="#2E1698">
+<b>Part I: Same work as for french analysis</b><br>
+      1. Data visualization<br>
+      2. Data cleaning<br>
+      3. List of the most frequent words<br>
+<br>
+<b>Part II: Bonus</b><br>
+      1. Sentiment Analysis : RSentiment<br>
+      2. Sentiment Analysis : syuzhet<br>
+      3. Graphic Representation<br>
+<br>
+</font>
+<br>
+
+<p><font size=4.5 color="#206B50"><center><B>PART I - 1. DATA VISUALIZATION</B></center></font></p>
+<font size=3 color="#2E1698">First things first, let's import the csv file. We are using french tweets this is why we need to specify the UTF-8 encoding. To have a better idea of our database we decided to show the first 5 lines.</font><br>
+
+
+```{R}
+#Packages needed
+
+#In order to have install_github function
+#install.packages("devtools")
+#library(devtools)
+
+#wordcloud2
+#install_github("lchiffon/wordcloud2")
+
+#others
+'install.packages("tm")
+install.packages("RSentiment") #Requiered Java 
+install.packages("plyr")
+install.packages("syuzhet")
+install.packages("wordcloud")
+install.packages("SnowballC")
+'
+```
+
+
+```{R}
+yourPath = paste0(getwd(),"/data/Lalaland.csv")
+
+tweets = read.csv(yourPath, encoding="UTF-8")
+print(dim(tweets))
+
+tweets <- subset(tweets, select=-c(replyToSN,replyToUID, replyToSID, latitude, longitude, favorited))
+#head(tweets, n=5)
+```
+
+<font color="#2E1698" size = 3.2>As you can see, our data frame contains <font color="red">17</font> columns and <font color="red">1 000</font> rows, let's see the 5 firsts rows.</font>
+<br>
+<br>
+<p><font size=4.5 color="#206B50"><center><B>PART I - 2. DATA CLEANING</B></center></font></p>
+<font color="#2E1698" size = 3.2>If we want to use the text, it have to be cleaned first.</font>
+
+
+```{R}
+clean_text = function(x)
+{
+    #To convert the text in lowercase
+    try.error = function(z)
+    {
+        y = NA
+        try_error = tryCatch(tolower(z), error=function(e) e)
+            if (!inherits(try_error, "error"))
+                y = tolower(z)
+                return(y)
+    }
+            
+    x = sapply(x, try.error)
+            
+    #Replace Emma by Stone 
+    x = gsub("emma", "stone", x)
+    
+    #Delete unecessary #lalaland or lalaland       
+    x = gsub("#lalaland\\w+ *", "", x) 
+            
+     #remove all links starting by http
+    x = gsub('http\\S+\\s*', '', x)
+            
+    # replace apostrophes
+    x = gsub("'", " ", x)
+
+    # remove punctuation except @, #, _, -
+    x = gsub("@", "AAAAAAAAAAA", x)
+    x = gsub("#", "BBBBBBBBBBB", x)
+    x = gsub("_", "CCCCCCCCCCC", x)
+    x = gsub("-", "DDDDDDDDDDD", x)
+    x = gsub("[[:punct:]]", " ", x)
+    x = gsub("AAAAAAAAAAA", "@", x)
+    x = gsub("BBBBBBBBBBB", "#", x)
+    x = gsub("CCCCCCCCCCC", "_", x)
+    x = gsub("DDDDDDDDDDD", "-", x)
+            
+    # correcting the spaces after the conserved @
+    x = gsub("@ ", "@", x)
+            
+    # correcting the spaces after the conserved _
+    x = gsub("_ ", "_", x)
+            
+    # correcting the spaces after the conserved -
+    x = gsub("- ", "-", x)
+    
+    # remove numbers/Digits
+    x = gsub("[[:digit:]]", "", x)
+    
+    # remove tabs
+    x = gsub("[ |\t]{2,}", " ", x)
+            
+    # remove blank spaces at the beginning/end
+    x = gsub("^ ", "", x)  
+    x = gsub(" $", "", x)
+    x = gsub("'", "", x)    
+    
+    # As we have already a column indicating if the tweet is a retweet or not 
+    # we can remove "RT @xxx" in the tweet header
+    x = gsub("rt @\\w+ *", "", x)
+    x = gsub('\\b\\w{1,3}\\s','', x)
+            
+    # remove double spaces
+    x = gsub("  ", " ", x)
+    x = gsub("  ", " ", x)
+    return(x)
+}
+                             
+tweets$text_cleaned <- clean_text(tweets$text)
+tweets$text <- clean_text(tweets$text)
+#head(tweets)
+```
+
+<font color="#2E1698" size = 3.2>
+As we selected only english tweets in our recover notebook, there is tweets without text, so the datraframe display NA in some text lines that we have to delete. 
+</font>
+
+
+```{R}
+sum(is.na(tweets$text_cleaned))
+```
+
+
+```{R}
+tweets = na.omit(tweets)
+tweets$X <- NULL
+nrow(tweets)
+```
+
+<font color="#2E1698" size = 3.2>
+There is now <font color = "darkred" size = 3.2>742</font> lines in our dataframe. <br><br>
+<p><font size=4.5 color="#206B50"><center><B>PART I - 3. LIST OF THE MOST FREQUENT WORDS</B></center></font></p>
+Let's see which are the most used @xxx and replace them with words. Afterward we will delete all the @xxx that will not be replaced.<br> 
+To do that, we created a function called number_Top able to recover words most used according to:<br>
+1. A specific pattern / first argument<br>
+2. The N number of words you want to return / second argument<br>
+3. The way you want to diplay it: decreasing = TRUE or FALSE / third argument<br>
+</font>
+
+
+```{R}
+number_Top = function(column ,at.pattern, number, Topdecreasing){
+
+    have.at = grep(x = column, pattern = at.pattern)
+    at.matches = gregexpr(pattern = at.pattern, text = column[have.at])
+    extracted.at = regmatches(x = column[have.at], m = at.matches)
+
+    # most frequent words
+    most_f_words = sort(unlist(extracted.at), decreasing=TRUE)
+    most_f_words = gsub(" ", "", most_f_words)
+    words = sort(table(unlist(most_f_words)), decreasing=TRUE)
+    
+    topWord = head(words, n = number)
+    topWord = sort(topWord, decreasing=Topdecreasing) 
+    return(topWord)
+}
+
+top5 = number_Top(tweets$text_cleaned, "@\\w+ *", 5, TRUE)
+barplot(sort(top5), border=NA, las=2, main="Top 5 most frequent user acount", cex.main=1, horiz=TRUE, col= "darkblue", cex.names=0.5)
+```
+
+<font color="#2E1698" size = 3.2>
+Now that we have seen the user account most used, we want to change it as simple words.<br>
+Then '@ryangosling' will be simply 'Gosling'. After that we will delete all # and @ characters.<br>
+Finally, using our previous function, and just by changing our pattern we will display the 15 most frequent words.<br>
+</font>
+
+
+```{R}
+clean_name_text = function(x)
+{
+    x = gsub('\\S+goslin\\S+', 'gosling', x)
+    x = gsub("@", "", x)
+    x = gsub("#", "", x)
+}
+
+tweets$text_cleaned <- clean_name_text(tweets$text_cleaned)
+```
+
+
+```{R}
+top15 = number_Top(tweets$text_cleaned, "[a-zA-Z]\\w+ *", 15, TRUE)
+barplot(sort(top15), border=NA, las=2, main="Top 15 most frequent word", cex.main=1, horiz=TRUE, col= "darkblue", cex.names=0.6)
+```
+
+<font color="#2E1698" size = 3.2>
+As we can see there is words like "this" or "with" not really meaningful.<br>
+English language is very convenient because it allows us to delete easily the common words being in the stopwords('english') tm function. <br>
+We have to create a regex on each value of this vector that we will use in order to delte each of those stopwords in our text.
+</font>
+
+
+```{R}
+#install.packages("tm")
+library(tm)
+stopwords('french')
+stopwords_regex = paste(c(stopwords('english'), "just", "behind"), collapse = '\\b|\\b')
+stopwords_regex = paste0('\\b', stopwords_regex, '\\b')
+```
+
+
+```{R}
+tweets$text_cleaned = stringr::str_replace_all(tweets$text_cleaned, stopwords_regex, '')
+
+top15 = number_Top(tweets$text_cleaned, "[a-zA-Z]\\w+ *", 15, TRUE)
+barplot(sort(top15), border=NA, las=2, main="Top 15 most frequent without stopwords", cex.main=1, horiz=TRUE, col= "darkblue", cex.names=0.5)
+```
+
+<p><font size=4.5 color="#206B50"><center><B>PART II - 1. SENTIMENT ANALYSIS: RSENTIMENT</B></center></font></p>
+<font color="#2E1698" size = 3.2>
+Let's introduce the RSentiment Package. This package has a function called calculate score which return a numeric vector according to the sentence emotion. For each tweet, we sum the vector values and return a score. 
+</font>
+
+
+```{R}
+#install.packages("RSentiment") #Requiered Java 
+library(RSentiment)
+
+tweets$score = 0
+for (i in 1:nrow(tweets)){
+ tweets$score[i] = sum(calculate_score(tweets$text[i]))   
+}
+
+tweets <- tweets[, c(1, 11, 12)]
+head(tweets)
+```
+
+<font color="#2E1698" size = 3.2>
+There is also a function 'calculate_total_presence_sentiment' which allows us return the summarized tweets sentiment.
+We just have to transpose the dataframe and then it's will be easy to show a meaningful barplot.
+</font>
+
+
+```{R}
+#install.packages("plyr")
+library(plyr)
+
+Global_Lalaland_Sentiment = calculate_total_presence_sentiment(tweets$text_cleaned)
+Global_Lalaland_Sentiment
+Global_Lalaland_Sentiment = data.frame(t(Global_Lalaland_Sentiment))
+Global_Lalaland_Sentiment = rename(Global_Lalaland_Sentiment, c("X1"="Emotions", "X2"="Score"))
+Global_Lalaland_Sentiment
+
+barplot(as.numeric(Global_Lalaland_Sentiment$Score), names = Global_Lalaland_Sentiment$Emotions, cex.names= 0.65,
+  xlab = "feelings", ylab = "Number of tweets having specific emotion", col = "darkblue",
+  main="Emotions in Lalaland tweets")
+```
+
+<p><font size=4.5 color="#206B50"><center><B>PART II - 2. SENTIMENT ANALYSIS: SYUZHET</B></center></font></p>
+<font color="#2E1698" size = 3.2>
+Furthermore, the syuzhet package has a 'get_nrc_sentiment' function which return if in a text there is: anger, anticipation, disgust, fear, joy, sadness, surprise, trust, negative or/and positive emotion.<br>
+So we created a column for each emotion.
+</font>
+
+
+```{R}
+#install.packages("syuzhet")
+library(syuzhet)
+
+tweets$anger = 0
+tweets$anticipation = 0
+tweets$disgust = 0
+tweets$fear = 0
+tweets$joy = 0
+tweets$sadness = 0
+tweets$surprise = 0
+tweets$trust = 0
+tweets$negative = 0
+tweets$positive = 0
+
+for(i in 1:nrow(tweets)){
+  if(get_nrc_sentiment(tweets$text_cleaned[i])$anger > 0){
+    tweets$anger[i] = 1
+  }
+  if(get_nrc_sentiment(tweets$text_cleaned[i])$anticipation > 0){
+    tweets$anticipation[i] = 1
+  } 
+  if(get_nrc_sentiment(tweets$text_cleaned[i])$disgust > 0){
+    tweets$disgust[i] = 1
+  }
+  if(get_nrc_sentiment(tweets$text_cleaned[i])$fear > 0){
+    tweets$fear[i] = 1
+  } 
+  if(get_nrc_sentiment(tweets$text_cleaned[i])$joy > 0){
+    tweets$joy[i] = 1
+  } 
+  if(get_nrc_sentiment(tweets$text_cleaned[i])$sadness > 0){
+    tweets$sadness[i] = 1
+  } 
+  if(get_nrc_sentiment(tweets$text_cleaned[i])$surprise > 0){
+    tweets$surprise[i] = 1
+  } 
+  if(get_nrc_sentiment(tweets$text_cleaned[i])$trust > 0){
+    tweets$trust[i] = 1
+  }
+  if(get_nrc_sentiment(tweets$text_cleaned[i])$negative > 0){
+    tweets$negative[i] = 1
+  } 
+  if(get_nrc_sentiment(tweets$text_cleaned[i])$positive > 0){
+    tweets$positive[i] = 1
+  } 
+}
+```
+
+<font color="#2E1698" size = 3.2>
+Now we can sum each column to have a global idea of the emotion that emerges from this film. 
+</font>
+
+
+```{R}
+sum_anger = sum(tweets$anger)
+sum_anticipation = sum(tweets$anticipation)
+sum_disgust = sum(tweets$disgust)
+sum_fear = sum(tweets$fear)
+sum_joy = sum(tweets$joy)
+sum_sadness = sum(tweets$sadness)
+sum_surprise = sum(tweets$surprise)
+sum_trust = sum(tweets$trust)
+sum_negative = sum(tweets$negative)
+sum_positive = sum(tweets$positive)
+
+sum_feelings_names = c("anger", "anticipation", "disgust", 
+                       "fear", "joy", "sadness", "surprise",
+                      "trust", "negative", "positive")
+sum_feelings = c(sum_anger, sum_anticipation, sum_disgust, 
+                 sum_fear, sum_joy, sum_sadness, sum_surprise, 
+                 sum_trust, sum_negative, sum_positive)
+
+df_feelings = data.frame(sum_feelings_names, sum_feelings)
+
+barplot(df_feelings$sum_feelings, names = df_feelings$sum_feelings_names, cex.names= 0.65,
+  xlab = "feelings", ylab = "Number of tweets having specific emotion", col = "darkblue",
+  main="Emotions in Lalaland tweets")
+```
+
+<p><font size=4.5 color="#206B50"><center><B>PART II - 3. GRAPHIC REPRESENTATION</B></center></font></p>
+<font color="#2E1698" size = 3.2>
+Just because it's fun, we display our results using a simple wordcloud and another one more  
+</font>
+
+
+```{R}
+#install.packages("wordcloud")
+#install.packages("SnowballC")
+library(SnowballC)
+library(wordcloud)
+
+tweets$text_cleaned = gsub("\\blalaland\\b", "", tweets$text_cleaned)
+tweets$text_cleaned = gsub("lalaland", "", tweets$text_cleaned)
+
+top50 = number_Top(tweets$text_cleaned, "[a-zA-Z]\\w+ *", 50, TRUE)
+wordcloud(names(top50), top50, min.freq=2)
+```
+
+
+```{R}
+#require(devtools)
+#install_github("lchiffon/wordcloud2")
+library(wordcloud2)
+
+top100 = number_Top(tweets$text_cleaned, "[a-zA-Z]\\w+ *", 100, TRUE)
+cat("The letterCloud function does not work on Jupyter notebook, if you are using markdown, you can uncomment this line.")
+wordcloud2(top100, size = 0.4, shape = 'star')
+```

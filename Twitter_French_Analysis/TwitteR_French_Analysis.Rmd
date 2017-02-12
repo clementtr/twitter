@@ -1,0 +1,821 @@
+---
+output: html_document
+---
+
+<p><font size=7 color="#2E1698"><u><center>Twitter French Analysis</center></u></font></p><br>
+<p><font size=3.2 color="#2E1698"><i><u>Introduction:</u></i> <br>We are here aiming to manipulate the data that we generated before. Our data was provided by the Twitter API and was filtring with the '#PrimaireLeDébat' hashtag. We recovered our data Thursday 19th January 2017 after the third french socialist political debat before presidential elections. Today we know Benoit Hamon won the elections whereas Manuel Valls was second. The other participants was Arnaud Montebourg, Vincent Peillon, Sylvia Pinel, François de Rugy and Jean-Luc Bennahmias. This debat was broadcast on the TV Channel 'France 2' and on the radio 'Europe 1'.</font><p>
+<br>
+<font color="#206B50" size = 4.5><center>**SUMMARY**</center></font>
+<font size=3.2 color="#2E1698">
+<b>Part I:</b> <br>
+          1. Data visualization<br>
+          2. Data cleaning
+<br>
+<b>Part II:</b><br>
+      1. Provide a list of the 15 most common words<br>
+      2. Provide a list of the 2 pairs of words having the highest co-occurrence frequency
+<br>
+<b>Part III:</b><br>
+          1. Build a graphical representation of the most frequent words with their polarity (pos/neg or anger/joy/fear/...)<br>
+          2. Indicate the 3 most frequent representatives words in each category<br>
+          3. Compare the results of the two approaches<br>
+</font>
+<br>
+<br>
+
+<p><font size=4.5 color="#206B50"><center><B>PART I - 1. DATA VISUALIZATION</B></center></font></p>
+<font size=3 color="#2E1698">First things first, let's import the csv file. We are using french tweets this is why we need to specify the UTF-8 encoding. To have a better idea of our database we decided to show the first 5 lines.</font><br>
+
+```{R}
+# Please uncomment the following lines to download the packages that are necessary for this notebook.
+
+#install.packages("tm") #need R 3.3.2
+#install.packages("wordcloud")
+#install.packages("SnowballC")
+#install.packages("plyr")
+#install.packages("devtools")
+#install.packages('ggplot2')
+#require("devtools")
+#install_github("lchiffon/wordcloud2")
+```
+
+
+```{R}
+yourPath = paste0(getwd(),"/data/debat_primaire_20000.csv")
+tweets = read.csv(yourPath, encoding="UTF-8")
+print(dim(tweets))
+head(tweets, n = 5)
+```
+
+<p><font color="#2E1698" size = 3.2>As you can see, our data frame contains <font color="red">17</font> columns and <font color="red">20 000</font> rows.</font><br></p>
+<font color="#2E1698" size = 3.2>Let's see if all the columns have multiple values, or if some are useless.</font>
+
+
+```{R}
+cat("UNIQUE", "\n")
+cat("Favorited: ",head(unique(tweets$favorited)), "\n")
+cat("FavoriteCount: ",head(unique(tweets$favoriteCount)), "\n")
+cat("ReplyToSN: ",head(unique(tweets$replyToSN)), "\n")
+cat("ReplyToUID: ",head(unique(tweets$replyToUID)), "\n")
+cat("Id: ",head(unique(tweets$id)), "\n")
+cat("IsRetweet: ",head(unique(tweets$isRetweet)), "\n")
+cat("Lattitude: ",head(unique(tweets$latitude)), "\n")
+cat("Longitude: ",head(unique(tweets$longitude)), "\n\n")
+```
+
+
+```{R}
+cat("Favorited TRUE: ", length(which(tweets$favorited == "TRUE")), "\n")
+cat("Favorited FALSE: ", length(which(tweets$favorited == "FALSE")), "\n\n")
+```
+
+<font  
+color="#2E1698" size = 3.2>We can see here that there is no TRUE value for favorited, only FALSE. favorited is useless though.</font>
+
+
+```{R}
+cat("No favoritedCount: ", length(which(tweets$favoriteCount == 0)), "\n")
+cat("At least one favoritedCount: ", length(which(tweets$favoriteCount != 0)), "\n")
+cat("Percentage of tweets that have favoritedCount",(3919/20000)*100,"%")
+```
+
+<font color="#2E1698" size = 3.2>The favoriteCount have multiple values, 20% of the are not 0 we better keep this column. It is maybe a significative data</font>
+
+
+```{R}
+cat("Tweets containing longitude information: ", length(which(tweets$longitude != "NA")), "\n")
+cat("Tweets containing latitude information: ", length(which(tweets$latitude != "NA")), "\n")
+cat("Percentage of tweets containing infos: ", 9/20000*100, "%")
+```
+
+<font color="#2E1698" size = 3.2>There is only 9 tweets over 20 000 that contains latitude and longitude, this represents only 0.045% of the tweets, this info can be considered as useless, and we can delete this two columns too.</font>
+
+
+
+```{R}
+cat("Tweets with replyToSN not null", length(which(tweets$replyToSN != "NA")),"\n")
+cat("Tweets with replyToUID not null", length(which(tweets$replyToUID != 'NA')), "\n")
+cat ("Tweets with replyToSID not null", length(which(tweets$replyToSID != 'NA')), "\n")
+cat("Percentage of tweets containing replyToSN/UID", 698/20000*100, "%", "\n")
+cat("Percentage of tweets containing replyToSID", 445/20000*100, "%")
+```
+
+<font color="#2E1698" size = 3.2>There is only about 3.5% of the replytoSN and replyToUID data that are not NA, we can delete these two columns as they don't seem to be interesting to study. Same thing for the replyToSID, with less than 2.5%.</font> <br><br><br>
+<font size=4.5 color="#206B50"><center><B>PART I - 2. DATA CLEANING</B></center></font>
+<br>
+<font color="#2E1698" size = 3.2>Let's delete these useless columns!</font>
+
+
+```{R}
+tweets <- subset(tweets, select=-c(replyToSN,replyToUID, replyToSID, latitude, longitude, favorited))
+head(tweets)
+```
+
+<font color="#2E1698" size = 3.2>If we want to use the text, it have to be cleaned first</font>
+
+
+
+```{R}
+clean_text = function(x)
+{
+    #To convert the text in lowercase
+    try.error = function(z)
+    {
+        y = NA
+        try_error = tryCatch(tolower(z), error=function(e) e)
+            if (!inherits(try_error, "error"))
+                y = tolower(z)
+                return(y)
+    }
+            
+    x = sapply(x, try.error)
+    
+    #Keep lepen > 3 letters
+    x = gsub("le pen", "lepen", x)
+    x = gsub("#primaire\\w+ *", "", x)
+            
+    #remove all links starting by http
+    x = gsub('http\\S+\\s*', '', x)
+    
+    # modifying ne and n' to keep negation in cleaned tweet.
+    x = gsub('ne', 'nenene', x)
+    x = gsub("n'", 'nenene ', x)
+    
+    # replace apostrophes
+    x = gsub("'", " ", x)
+
+    # remove punctuation except @, #, _, -
+    x = gsub("@", "AAAAAAAAAAA", x)
+    x = gsub("#", "BBBBBBBBBBB", x)
+    x = gsub("_", "CCCCCCCCCCC", x)
+    x = gsub("-", "DDDDDDDDDDD", x)
+    x = gsub("[[:punct:]]", " ", x)
+    x = gsub("AAAAAAAAAAA", "@", x)
+    x = gsub("BBBBBBBBBBB", "#", x)
+    x = gsub("CCCCCCCCCCC", "_", x)
+    x = gsub("DDDDDDDDDDD", "-", x)
+            
+    # correcting the spaces after the conserved @
+    x = gsub("@ ", "@", x)
+            
+    # correcting the spaces after the conserved _
+    x = gsub("_ ", "_", x)
+            
+    # correcting the spaces after the conserved -
+    x = gsub("- ", "-", x)
+    
+    # remove numbers/Digits
+    x = gsub("[[:digit:]]", "", x)
+    
+    # remove tabs
+    x = gsub("[ |\t]{2,}", " ", x)
+            
+    # remove blank spaces at the beginning/end
+    x = gsub("^ ", "", x)  
+    x = gsub(" $", "", x)
+    
+    
+    # As we have already a column indicating if the tweet is a retweet or not 
+    # we can remove "RT @xxx" in the tweet header
+    x = gsub("rt @\\w+ *", "", x)
+    
+    # Remove words of 3 letters or less excepted negation, bon and loi:
+    x = gsub ('pas', 'paspaspas', x)
+    x = gsub ('bon', 'bonbonbon', x)
+    x = gsub ('loi', 'loiloiloi', x)
+    x = gsub('\\b\\w{1,3}\\s','', x)
+    x = gsub ('loiloiloi', 'loi', x)
+    x = gsub ('bonbonbon','bon', x)
+    x = gsub('nenene', 'ne', x)
+    x = gsub ('paspaspas', 'pas', x)
+
+    x = gsub('bachar', '', x)
+    x = gsub('assad', 'alassad', x)
+            
+    # remove double spaces
+    x = gsub("  ", " ", x)
+    x = gsub("  ", " ", x)
+    return(x)
+}
+tweets$originalTweet <- tweets$text                             
+tweets$text_cleaned_wordcount <- clean_text(tweets$text) #Part II
+tweets$text_cleaned_sentiment <- clean_text(tweets$text) #Part III
+tweets$text <- NULL
+colnames(tweets)[1] <- "ID"
+                             
+tweets <- tweets[, c(1, 11, 12, 13, 2, 3, 4, 5, 6, 7, 8, 9, 10)]
+head(tweets)
+```
+
+<font color="#2E1698" size = 3.2>Let's see which are the most used @xxx and replace them with words. Afterward we will delete all the @xxx that will not be replaced.<br> 
+To do that, we created a function called number_Top able to recover words most used according to:
+<br>
+A specific pattern / first argument<br>
+The N number of words you want to return / second argument<br>
+The way you want to diplay it: decreasing = TRUE or FALSE / third argument<br>
+</font>
+
+
+```{R}
+number_Top = function(column ,at.pattern, number, Topdecreasing){
+
+    have.at = grep(x = column, pattern = at.pattern)
+    at.matches = gregexpr(pattern = at.pattern, text = column[have.at])
+    extracted.at = regmatches(x = column[have.at], m = at.matches)
+
+    # most frequent words
+    most_f_words = sort(unlist(extracted.at), decreasing=TRUE)
+    most_f_words = gsub(" ", "", most_f_words)
+    words = sort(table(unlist(most_f_words)), decreasing=TRUE)
+    
+    topWord = head(words, n = number)
+    topWord = sort(topWord, decreasing=Topdecreasing) 
+    return(topWord)
+}
+
+top40 = number_Top(tweets$text_cleaned_wordcount, "@\\w+ *", 40, TRUE)
+top40
+```
+
+
+```{R}
+clean_name_text = function(x)
+{
+  x = gsub('\\S+hamo\\S+', 'hamon', x)
+  x = gsub('\\S+ontebou\\S+', 'montebourg', x)
+  x = gsub('\\S+vall\\S+', 'valls', x)
+  x = gsub('\\S+peillon\\S+', 'peillon', x)
+  x = gsub('\\S+rugy\\S+', 'derugy', x)
+  x = gsub('\\S+macro\\S+', 'macron', x)
+  x = gsub('\\S+francet\\S+', 'francetv', x)
+  x = gsub('\\S+pinel\\S+', 'pinel', x)
+  x = gsub('\\S+nnahmia\\S+', 'bennahmias', x)
+  x = gsub('\\S+eunesavecam\\S+', 'montebourg', x) #jeunes avec Arnaud Montebourg
+  x = gsub('\\S+galut\\S+', 'galut', x) 
+  x = gsub('\\S+donald\\S+', 'trump', x)
+  x = gsub('\\S+trump\\S+', 'trump', x)
+  x = gsub('\\S+najat\\S+', 'najatvb', x)
+  x = gsub('\\S+vallaud\\S+', 'najatvb', x)
+  x = gsub('\\S+elkacem\\S+', 'najatvb', x)
+  x = gsub('\\S+europe\\S+', 'europe', x)
+  x = gsub('\\S+olland\\S+', 'hollande', x)
+  x = gsub('\\S+ujada\\S+', 'pujadas', x)
+  x = gsub('\\S+ujada\\S+', 'pujadas', x)
+  x = gsub('\\S+taubir\\S+', 'taubira', x)
+  x = gsub('\\S+sapin\\S+', 'sapin', x)
+  x = gsub('\\S+guillaumetc\\S+', 'taubira', x)
+  x = gsub('\\S+aubry\\S+', 'aubry', x)
+  x = gsub('\\S+compile\\S+', 'compile', x)
+  x = gsub('\\S+melenchon\\S+', 'melenchon', x)
+  x = gsub('\\S+francei\\S+', 'franceinfo', x)
+  x = gsub('\\S+bfm\\S+', 'bfmtv', x)
+  x = gsub('\\S+namia\\S+', 'namias', x)
+  x = gsub('\\S+vp_\\S+', 'peillon', x)
+  x = gsub('\\S+fillon\\S+', 'fillon', x)
+  x = gsub('\\S+avecmv\\S+', 'valls', x) #Avec Manuel Valls
+  x = gsub('\\S+mlp\\S+', 'lepen', x)
+
+  x = gsub("#\\w+ *", "", x)
+  x = gsub("@\\w+ *", "", x)
+}
+
+tweets$text_cleaned_wordcount <- clean_name_text(tweets$text_cleaned_wordcount)
+```
+
+<p><font size=4.5 color="#206B50"><center><B>PART II - 1: LIST OF 15 MOST COMMON WORD</B></center></font></p>
+<font color="#2E1698" size = 3.2>Let's see which are the most used words.<br>
+First, let's look at the 30 most frequent words. <br>
+Thanks to the function we created just above we can easily return the 30 most frequent words by juste changing our pattern argument.</font>
+
+
+```{R}
+top30 = number_Top(tweets$text_cleaned_wordcount, "[a-zA-Z]\\w+ *", 30, FALSE)
+barplot(top30, border=NA, las=2, main="Top 30 most frequent word", cex.main=1, horiz=TRUE, col= "darkblue", cex.names=0.65)
+```
+
+<font color="#2E1698" size = 3.2>We can see in the display of the 30 most frequent word that some of them are not revelant like the preposition 'dans' so we want to clean our text again.<br>
+We can also do like we did in english analysis creating stopwords_regex.
+</font>
+
+
+```{R}
+library(tm)
+stopwords('french')
+stopwords_regex = paste(stopwords('french'), collapse = '\\b|\\b')
+stopwords_regex = paste0('\\b', stopwords_regex, '\\b')
+```
+
+<font color="#2E1698" size = 3.2>
+Before to clean our text with stopwords regex, we will save our column as 'text_cleaned_sentiment' column name because we will probably need words being in stopwords like 'ne' or 'pas' for sentiment analysis. 
+</font>
+
+
+```{R}
+tweets$text_cleaned_sentiment = tweets$text_cleaned_wordcount
+tweets$text_cleaned_wordcount = stringr::str_replace_all(tweets$text_cleaned_wordcount, stopwords_regex, '')
+
+top15 = number_Top(tweets$text_cleaned_wordcount, "[a-zA-Z]\\w+ *", 15, TRUE)
+barplot(sort(top15), border=NA, las=2, main="Top 15 most frequent without stopwords", cex.main=1, horiz=TRUE, col= "darkblue", cex.names=0.5)
+```
+
+<font color="#2E1698" size = 3.2>
+As there is still not meaningful word we removed it by hand with a clean prepositions function.
+</font>
+
+
+```{R}
+clean_prepo_text = function(x){
+    x = gsub("quand ", "", x)
+    x = gsub("faut ", "", x)
+    x = gsub("veux ", "", x)
+    x = gsub("tre ", "", x)
+    x = gsub("tout ", "", x)
+    x = gsub("plus ", "", x)
+    x = gsub("doit ", "", x)
+    x = gsub("fait ", "", x)
+    x = gsub("faire ", "", x)
+    x = gsub("comme ", "", x)
+    x = gsub("tout ", "", x)
+    x = gsub("quand ", "", x)
+    x = gsub("suis ", "", x)
+}
+
+tweets$text_cleaned_wordcount <- clean_prepo_text(tweets$text_cleaned_wordcount)
+
+top15 = number_Top(tweets$text_cleaned_wordcount, "[a-zA-Z]\\w+ *", 15, FALSE)
+barplot(top15, border=NA, las=2, main="Top 15 most frequent & meaningful words", cex.main=1, horiz=TRUE, col= "darkblue", cex.names=0.65)
+```
+
+<br>
+<p><font size=4.5 color="#206B50"><center><B>PART II - 2: LIST OF THE 2 PAIRS OF WORDS HAVING THE HIGHEST CO_OCCURRENCE FREQUENCY</B></center></font></p>
+
+<font color="#2E1698" size = 3.2>As we did before we will select, in a first time, more words than necessary in order to have a larger palette of work. <br>
+So let's recover the top 20 of the most used words, and thanks to the package "tm" (need R 3.3.2) find the most correlated words to both of those top 20 having at least a cooccurrence score of 0.3. 
+</font>
+
+
+```{R}
+library(tm) # need R 3.3.2
+docs <- Corpus(VectorSource(tweets$text_cleaned_wordcount))
+dtm <- TermDocumentMatrix(docs)
+
+top20 = number_Top(tweets$text_cleaned_wordcount, "[a-zA-Z]\\w+ *", 20, FALSE)
+associations = findAssocs(dtm, names(top20), corlimit = 0.3)
+associations
+```
+
+<font color="#2E1698" size = 3.2>Now that we have discover all the associations, we want to generate an algorithm able to organize intelligently those data as a dataframe no matter how is the input / text / subject / ... <br>
+Once the dataframe is created using '|' as separator we can create easily several columns.
+</font>
+
+
+```{R}
+vect = c()
+
+for(i in 1:15){
+    size1 = length(associations[i][[1]])
+    if(size1 > 0){
+        size2 = length(associations[i][[1]])
+        for(j in 1:size2){
+            vect = c(vect, paste0(names(top20)[i],"|" , names(associations[i][[1]][j]), "|",associations[i][[1]][[j]][1]))
+        }  
+    }
+}
+
+cooccurrence_df = data.frame(vect)
+head(cooccurrence_df)
+
+cooccurrence_df <- data.frame(do.call('rbind', strsplit(as.character(cooccurrence_df$vect),'|',fixed=TRUE)))
+colnames(cooccurrence_df) <- c("word_1", "word_2", "score")
+head(cooccurrence_df)
+```
+
+<font color="#2E1698" size = 3.2>Now that we have a proper dataframe, we can sort it by score and recover the best cooccurrence.<br/><br/>
+The first graphical representation we'll do is a wordcloud representing what we found in the part above (most used words). To do that we will use wordcloud library which is really representative for our work. Let's see what does it look like in our case.<br><br>
+
+
+```{R}
+cooccurrence_df = cooccurrence_df[with(cooccurrence_df, order(-as.numeric(score), word_1)), ]
+head(cooccurrence_df, n=15)
+```
+
+
+```{R}
+library(SnowballC)
+library(wordcloud)
+
+top50 = number_Top(tweets$text_cleaned_wordcount, "[a-zA-Z]\\w+ *", 50, FALSE)
+wordcloud(names(top50), top50, min.freq=2)
+```
+
+
+```{R}
+
+library(wordcloud2)
+top100 = number_Top(tweets$text_cleaned_wordcount, "[a-zA-Z]\\w+ *", 100, FALSE)
+cat("The letterCloud function does not work on Jupyter notebook, if you are using markdown, you can uncomment this line.")
+#letterCloud(top100, word = "PS", wordSize = 1)
+wordcloud2(top100, color = "random-light", backgroundColor = "grey")
+```
+
+<p><font size=4.5 color="#206B50"><center><B>PART III - 1: GRAPHICAL REPRESENTATION</B></center></font></p>
+<font color="#2E1698" size = 3.2>The first step is to categorize each tweet then we will see the most common word in each category (positive, neutral, negative). So far we have found and traduce a list of positive and negative words, stored into a .txt file.
+</font>
+
+
+```{R}
+#evaluation tweets function
+sentence <- tweets$text_cleaned_sentiment
+
+score.sentiment <- function(sentences, pos.words, neg.words, .progress='none')
+{
+  require(plyr)
+  require(stringr)
+  scores <- laply(sentences, function(sentence, pos.words, neg.words){
+    word.list <- str_split(sentence, ' ')
+    words <- unlist(word.list)
+    pos.matches <- match(words, pos.words)
+    neg.matches <- match(words, neg.words)
+    pos.matches <- !is.na(pos.matches)
+    neg.matches <- !is.na(neg.matches)
+    score <- sum(pos.matches) - sum(neg.matches)
+    return(score)
+  }, pos.words, neg.words, .progress=.progress)
+ scores.df <- data.frame(score=scores, text_cleaned_sentiment=sentences)
+ return(scores.df)
+}
+
+yourPath = paste0(getwd(),"/data/NegPos/Positive.txt")
+pos <- scan(yourPath, what='character', comment.char=';') #folder with positive dictionary
+yourPath = paste0(getwd(),"/data/NegPos/Negative.txt")
+neg <- scan(yourPath, what='character', comment.char=';') #folder with negative dictionary
+scores <- score.sentiment(sentence, pos, neg, .progress='text')
+head(scores)
+```
+
+
+```{R}
+#total evaluation: positive / negative / neutral
+stat <- scores
+stat$created <- tweets$created
+stat$created <- as.Date(stat$created)
+stat <- mutate(stat, tweet=ifelse(stat$score > 0, 'positive', ifelse(stat$score < 0, 'negative', 'neutral')))
+head(stat)
+```
+
+<font color="#2E1698" size = 3.2>As you can see here there is a problem, some tweets are not scored as they should be. For example the word "incarner" could be in the 'Positive' dictionary but written as "incarne" or "incarné". We should use stemming both on our tweets and on our positive/negative dictionaries.</font>
+<br/>
+<font color="#2E1698" size = 3.2>Let's see what we get using stemming this time!</font>
+
+
+```{R}
+# This function will use stemming on a list
+stemming = function(unstem_list){
+  # To use stemming we have to convert our list of words into a corpus.
+  list_corpus <- VCorpus(VectorSource(unstem_list))
+  list_stem <- tm_map(list_corpus, PlainTextDocument)  # needs to come before stemming
+  list_stem <- tm_map(list_stem, stemDocument, "french")
+  #Converting the corpus into a dataframe
+  dataframe_stemmed<-data.frame(text=unlist(sapply(list_stem, `[`, "content")), stringsAsFactors=F)
+  return(dataframe_stemmed)
+}
+
+# This function will use stemming on a dictionary
+stemming_dictionary = function(path){
+  yourPath = paste0(getwd(),path)
+  # First we read the dictionary and store it into a variable
+  dictionary = read.table(yourPath, sep='\n')
+  # There might be some values present more than once, so let's make it unique
+  dictionary = unique(dictionary)
+  dictionary = dictionary$V1
+  dataframe_stemmed = stemming(dictionary)
+  dataframe_stemmed<-unique(dataframe_stemmed)
+  return(dataframe_stemmed)
+}
+neg_stem = stemming_dictionary("/data/NegPos/Negative.txt")$text                                 
+head(neg_stem)
+pos_stem = stemming_dictionary("/data/NegPos/Positive.txt")$text                                 
+head(pos_stem)
+                                                                
+# And now we create 2 txt files containing the words negative and positive after stemming
+# 
+
+#write.table(neg_stem, file = "NegPos/NegativeStem.txt", append = FALSE, quote = FALSE, sep = "\n",
+#            na = "NA", dec = ".", row.names = FALSE,
+#            col.names = FALSE)
+#write.table(pos_stem, file = "NegPos/PositiveStem.txt", append = FALSE, quote = FALSE, sep = "\n",
+#            na = "NA", dec = ".", row.names = FALSE,
+#            col.names = FALSE)
+```
+
+
+```{R}
+# Stemming of the tweets
+dataframe_stem <- stemming(tweets$text_cleaned_sentiment)
+
+#evaluation tweets after stemming function
+yourPath = paste0(getwd(),"/data/NegPos/PositiveStem.txt")
+pos <- scan(yourPath, what='character', comment.char=';') #folder with positive dictionary
+yourPath = paste0(getwd(),"/data/NegPos/NegativeStem.txt")
+neg <- scan(yourPath, what='character', comment.char=';') #folder with negative dictionary
+
+scores <- score.sentiment(dataframe_stem$text, pos_stem, neg_stem, .progress='text')
+head(scores)
+```
+
+
+```{R}
+#total evaluation: positive / negative / neutral
+stat <- scores
+stat$originalTweet <- tweets$originalTweet
+stat$text_cleaned_sentiment <- scores$text_cleaned_sentiment
+#stat$text_cleaned_sentiment <- tweets$text_cleaned_sentiment
+stat <- mutate(stat, tweet=ifelse(stat$score > 0, 'positive', ifelse(stat$score < 0, 'negative', 'neutral')))
+
+# Now let's add a new column polarity, if a score if greeater than 3, the tweet is qualifies as very negative/positive
+check_score = function(score){
+    if(score >= 3){
+        polarity = "VeryPositive"
+    }
+    else if(score <= -3){
+        polarity = "VeryNegative"
+    }
+    else if(score == 0){
+        polarity = "neutral"
+    }
+    else if (score > 0 && score < 3){
+        polarity = "positive"
+    }
+    else if(score < 0 && score > -3){
+        polarity = "negative"
+    }
+    return(polarity)
+}
+stat$polarity = lapply(stat$score, check_score)
+head(stat)
+```
+
+
+```{R}
+pola<-unlist(stat$polarity)
+frequency<-table(pola)
+sorted.frequency.list<-sort(frequency, decreasing=TRUE)
+barplot(sorted.frequency.list, main="Distribution of tweets", xlab="polarity", col = "darkblue")
+```
+
+<font color="#2E1698" size = 3.2>Now that we have a score on each tweet, let's study the words' occurence.</font><br>
+<font color="#2E1698" size = 3.2>We are going to simply see, like we did before, which word is appearing the most in our positive/negative only dataframe that we are going to create.</font>
+
+
+```{R}
+# Building a dataframe with only positive tweets.
+positive_tweets = subset(stat, tweet == 'positive')
+
+# Let's see which are the word that appear the most:
+tweet = positive_tweets$text_cleaned_sentiment
+tweet = gsub("une", "", tweet)
+#Using the function number_top already defined before:
+top3pos = number_Top(tweet, "[a-zA-Z]\\w+ *", 3, FALSE)
+
+# Same thing with negative tweets
+negative_tweets = subset(stat, tweet == 'negative')
+tweet = negative_tweets$text_cleaned_sentiment
+top3neg = number_Top(tweet, "[a-zA-Z]\\w+ *", 3, FALSE)
+
+#Now we create a dataframe with correct format to be able to plot it with ggplot
+dfpos = data.frame(top3pos)
+dfneg = data.frame(top3neg)
+dfpos$position = c("3", "2", "1")
+dfneg$position = c("3", "2", "1")
+dfpos$polarity = "Positive tweets"
+dfneg$polarity = 'Negative tweets'
+df_temp = rbind(dfneg, dfpos)
+df_temp = df_temp[with(df_temp, order(position, polarity)), ]
+```
+
+
+```{R}
+library(ggplot2)
+df_plot = data.frame(ranking=df_temp$position, 
+                polarity=df_temp$polarity, 
+                freq=sort(df_temp$Freq, decreasing = TRUE),
+                word = df_temp$Var1
+               )
+
+ggplot(df_plot, aes(ranking, freq, fill = polarity)) + 
+geom_bar(stat="identity", position = "dodge") + 
+geom_text(aes(label=word), vjust=-0.250, position=position_dodge(width=0.9)) + 
+labs(title="Plot of most frequent words in positive/negative tweets", x="Ranking", y = "Frequence")
+```
+
+<font color="#2E1698" size = 3.2>Well, we can see after this little study that there is not much differences between 'positive' and 'negative' tweets. The most occuring words are neither positive or negative and are the same as in the top 15 we did before.</font>
+<br/><br/>
+<font color="#2E1698" size = 3.2>Now let's see what we get using another strategy:
+<br>
+1. Building a column containing only positive/negative words of a tweet<br>
+2. Analyse this column only and see which words are appearing the most<br>
+</font>
+
+
+```{R}
+extract_words = function(path, df_tweets){
+  #Building positive.words column:
+  yourPath = paste0(getwd(),path)
+  dictionary <- scan(yourPath, what='character', comment.char=';')
+  word.list <- str_split(df_tweets$text, " ")
+  df_tweets$dictionary.words <- word.list
+
+  # this function will create a list of words by comparing if the words in tweet are in the dictionary
+  dictionary_words = function(sentence){
+    b = c()
+    i = 0
+    for(w in sentence){
+      if(w %in% dictionary){
+        i = i + 1
+        b[i] <- w
+      }
+    }
+    return(b)
+  }
+  df_tweets$dictionary.words <- lapply(df_tweets$dictionary.words, dictionary_words)
+  return(df_tweets)
+}
+positive_tweets = extract_words("/data/NegPos/PositiveStem.txt", positive_tweets)
+negative_tweets = extract_words("/data/NegPos/NegativeStem.txt", negative_tweets)
+head(positive_tweets)
+```
+
+
+```{R}
+extract_words2 = function(path1, path2, df_tweets){
+  #Building positive.words column:
+  yourPath = paste0(getwd(),path1)
+  dictionary1 <- scan(yourPath, what='character', comment.char=';')
+  yourPath = paste0(getwd(),path2)
+  dictionary2 <- scan(yourPath, what='character', comment.char=';')
+  word.list <- str_split(df_tweets$text, " ")
+  df_tweets$dictionary.words <- word.list
+
+  # this function will create a list of words by comparing if the words in tweet are in the dictionary
+  dictionary_words2 = function(sentence){
+    b = c()
+    i = 0
+    for(w in sentence){
+      if(w %in% dictionary1 || w %in% dictionary2){
+        i = i + 1
+        b[i] <- w
+      }
+    }
+    return(b)
+  }
+  df_tweets$dictionary.words <- lapply(df_tweets$dictionary.words, dictionary_words2)
+  return(df_tweets)
+}
+stat = extract_words2("/data/NegPos/PositiveStem.txt","/data/NegPos/NegativeStem.txt", stat)
+head(stat)
+```
+
+
+```{R}
+words.vector<-unlist(stat$dictionary.words)
+freq.list<-table(words.vector)
+sorted.freq.list<-sort(freq.list, decreasing=TRUE)
+mfw = head(sorted.freq.list, n = 100, decreasing = FALSE)
+df_words_freq = data.frame(mfw)
+a = 0
+path_pos = "/data/NegPos/PositiveStem.txt"
+path_neg = "/data/NegPos/NegativeStem.txt"
+yourPath = paste0(getwd(), path_pos)
+pos_dictionary <- scan(yourPath, what='character', comment.char=';')
+yourPath = paste0(getwd(), path_neg)
+neg_dictionary <- scan(yourPath, what='character', comment.char=';')
+for(i in df_words_freq$words.vector){
+    a = a + 1
+    if(i %in% pos_dictionary){
+        df_words_freq$polarity[a] = "pos"
+    }
+    else if(i %in% neg_dictionary){
+        df_words_freq$polarity[a] = "neg"
+    }
+    
+}
+   
+barplot(head(mfw, 20), border=NA, las=2, main="Top 20 most frequent word with polarity", 
+        cex.main=1, horiz=TRUE, col= ifelse(df_words_freq$polarity == "pos", 'green', 'red'), cex.names=0.65)
+legend("topright", c("positive","negative"), pch=c(19,19), col=c("green","red"))
+```
+
+<font color="#2E1698" size = 3.2>
+We can now create a wordcloud displaying positives and negatives most used words separatly.
+</font>
+
+
+```{R}
+df_pos_words = df_words_freq[which(df_words_freq$polarity == "pos"),]
+df_neg_words = df_words_freq[which(df_words_freq$polarity == "neg"),]
+df_pos_words = head(df_pos_words, 20)
+df_neg_words = head(df_neg_words, 20)
+df_pos_words$Freq <- NULL
+df_pos_words$polarity <- NULL
+df_neg_words$Freq <- NULL
+df_neg_words$polarity <- NULL
+all = c(df_pos_words, df_neg_words)
+
+# create corpus
+corpus = Corpus(VectorSource(all))
+
+# create term-document matrix
+tdm = TermDocumentMatrix(corpus)
+
+# convert as matrix
+tdm = as.matrix(tdm)
+
+# add column names
+colnames(tdm) = c("Positive", "Negative")
+
+comparison.cloud(tdm, random.order=FALSE, colors = c("darkred", "darkblue", "blue", "darkblue"), 
+                 title.size=1.5, max.words=50, scale=c(2,.5))
+```
+
+<p><font size=4.5 color="#206B50"><center><B>PART III - 2: Indicate 3 most frequent words in each category</B></center></font></p>
+
+
+```{R}
+#Plotting our result
+plot_words = function(df_tweets){
+  words.vector<-unlist(df_tweets$dictionary.words)
+  freq.list<-table(words.vector)
+  sorted.freq.list<-sort(freq.list, decreasing=TRUE)
+  mfw = head(sorted.freq.list, n = 5)
+  return(mfw)
+}
+mfw_pos = plot_words(positive_tweets)
+mfw_neg = plot_words(negative_tweets)
+
+#Now we create a dataframe with correct format to be able to plot it with ggplot
+dfpos = data.frame(mfw_pos)
+dfneg = data.frame(mfw_neg)
+dfpos$position = c("1", "2", "3", "4", "5")
+dfneg$position = c("1", "2", "3", "4", "5")
+dfpos$polarity = "Positive words"
+dfneg$polarity = 'Negative words'
+df_temp = rbind(dfneg, dfpos)
+df_temp = df_temp[with(df_temp, order(position, polarity)), ]
+
+df_plot = data.frame(ranking=df_temp$position, 
+                polarity=df_temp$polarity, 
+                freq=df_temp$Freq,
+                word = df_temp$words.vector
+               )
+
+ggplot(df_plot, aes(ranking, freq, fill = polarity)) + 
+geom_bar(stat="identity", position = "dodge") + 
+geom_text(aes(label=word), vjust=-0.250, position=position_dodge(width=0.9)) + 
+labs(title="Plot of most frequent positive/negative words", x="Ranking", y = "Frequence")
+```
+
+<font color="#2E1698" size = 3.2>So, we can see here for the positive stemmed words with the highest appearence frequency in positive tweets. We have:
+   <br>
+      1. 'fait', the word with the highest frequency.<br>
+      2. 'plus'<br>
+      3. 'droit', with stemming it regroups also words of the same root, like: <br>
+        
+          a. droits<br>
+          b. droite<br>
+          c. droites<br>
+        
+      4. 'bien'<br>
+      5. 'sérieux'<br>
+</font>
+<br/>
+<font color="#2E1698" size = 3.2>Same thing for negative stemmed words with the highest appearence frequency in negative tweets. We have:<br>
+      1. 'femm', the word with the highest frequency which is not even a real word but regroup words with roots like:<br>
+        a. femmes<br>
+        b. femme<br>
+      2. 'flou', that can regroup:<br>
+        a. flou<br>
+        b. flous<br>
+ And maybe mispelled words like 'floux'<br>
+      3. 'lutt' that may regroup:<br>
+        a. lutte<br>
+        b. luttes<br>
+        c. lutter, etc.<br>
+      4. 'question'<br>
+      5. 'seul'<br>
+</font>
+
+<p><font size=4.5 color="#206B50"><center><B>PART III - 3: Compare the results of the two approaches</B></center></font></p>
+
+<font color="#2E1698" size = 3.2>To sum up what we did, we used two main approches:
+1. The first one was to list the most frequent words with their polarity in all the tweets (no matter if they are positive, neutral or negative)<br>
+2. The second one was to analyse which are the positive words most present in positive tweets and same thing for negative tweets.<br>
+<br>
+After this we can clearly see that the frequency of the words is higher in the first approach compared to the second. For example, the word 'femm' is much more frequent in the first analysis than in the second one.<br>
+This can easily be explained by the fact that there is a nuance on the scoring of a tweet, a positive tweets may contain negative words, and a negative tweet may contain positive words. So for the word 'femm' which is a negative word (blame it on the dictionary!) it is more frequent in negative tweets, but it is also present in positive tweets.
+<br>
+<br>
+Moreover, we also can see that some positive words that are very frequent in all the tweets like 'contr' or 'droit' are not in the most present words in positive tweets. So we can conclude that there is a little difference between a positive word, and a positive word present in positive tweets.
+<br>
+<br>
+Also, after this study we can also say that the sentiment analysis is not performant in sarcastic tweets and it does not take care of the negation. We kept the negation words "pas" and "ne" for an eventually future study by inverting the score of a word like this: "ne XXX pas", if XXX as a +1 score, we convert it to -1 and if it has a -1 score, the negation will convert it into +1. This study is still improvable!
+</font>
